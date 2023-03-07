@@ -1,0 +1,74 @@
+seed_everything: 42
+
+trainer:
+  default_root_dir: ${oc.env:AMLT_OUTPUT_DIR,outputs}
+
+  num_nodes: 1
+  devices: 2
+  accelerator: gpu
+  strategy: deepspeed_stage_3 #ddp_find_unused_parameters_false
+
+  min_epochs: 1
+  max_epochs: 1
+  enable_progress_bar: true
+
+  precision: 16
+  gradient_clip_val: 1
+  gradient_clip_algorithm: "norm"
+  sync_batchnorm: True
+  enable_checkpointing: True
+  resume_from_checkpoint: null
+
+  # debugging
+  fast_dev_run: false
+
+
+data_name: "char"
+data:
+  dataset_config:
+    input_path: "./data/input.txt"
+    block_size: 128
+  
+  dataloader_config:
+    batch_size: 1024
+    num_workers: 12
+    pin_memory: True
+
+model_name: "minGPT"
+model:
+  model_config:
+    model_name: "fGPT"
+    vocab_size: None
+    attention: "scaled_dot_product"
+  optimizer_config:
+    lr: 6e-4
+    betas: [0.9, 0.95]
+    weight_decay: 0.0005
+  scheduler_config:
+    warmup_epochs: ${eval:'${trainer.max_epochs} * 0.1'} 
+    max_epochs: ${trainer.max_epochs}
+    start_lr: 1e-6
+    min_lr: 1e-6
+
+logger:
+  tensorboard:
+    _target_: pytorch_lightning.loggers.tensorboard.TensorBoardLogger
+    save_dir: ${trainer.default_root_dir}/logs
+    name: null
+    version: null
+    log_graph: False
+    default_hp_metric: True
+    prefix: ""
+
+callbacks:
+
+  model_summary:
+    _target_: pytorch_lightning.callbacks.RichModelSummary
+    max_depth: -1
+
+  progress:
+    _target_: pytorch_lightning.callbacks.RichProgressBar
+
+  lr_mon:
+    _target_: pytorch_lightning.callbacks.LearningRateMonitor
+    logging_interval: "epoch"
